@@ -13,6 +13,8 @@
 struct ReceivedPacket {
     std::vector<uint8_t> data;
     uint64_t timestamp;
+    int8_t rssi;           
+    uint32_t src_l2id;     
 };
 
 class PacketQueue {
@@ -145,7 +147,6 @@ public:
     void processPacketQueue() {
         ReceivedPacket packet;
         
-        // Process up to 20 packets per RPC call
         int processed = 0;
         while (processed < 20 && packet_queue_.pop(packet)) {
             std::lock_guard<std::mutex> lock(listener_mutex_);
@@ -157,20 +158,43 @@ public:
             try {
                 auto request = listener_->onDataIndicationRequest();
                 
-                // Set frame data
+                // Set frame data with real source address from L2 ID
                 auto frame = request.initFrame();
+                
+                // Convert L2 ID to MAC address (32-bit L2 ID padded to 48-bit MAC)
+                uint8_t source_mac[6] = {
+                    0x00, 0x00,  // Padding
+                    static_cast<uint8_t>((packet.src_l2id >> 24) & 0xFF),
+                    static_cast<uint8_t>((packet.src_l2id >> 16) & 0xFF),
+                    static_cast<uint8_t>((packet.src_l2id >> 8) & 0xFF),
+                    static_cast<uint8_t>(packet.src_l2id & 0xFF)
+                };
+                frame.setSourceAddress(kj::arrayPtr(source_mac, 6));
+                
+                // Destination is broadcast for CAMs
+                uint8_t dest_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+                frame.setDestinationAddress(kj::arrayPtr(dest_mac, 6));
+                
                 frame.setPayload(kj::arrayPtr(packet.data.data(), packet.data.size()));
                 
-                // Set RX parameters with timestamp
+                // Set RX parameters with CV2X-specific data
                 auto rxParams = request.initRxParams();
+                
+                // Set CV2X parameters including RSSI
+                auto cv2xParams = rxParams.initCv2x();
+                // Convert RSSI back to dbm8 format (dBm * 8) for protocol
+                cv2xParams.setPower(static_cast<int16_t>(packet.rssi * 8));
+                
+                // Set timestamp
                 auto timestamp = rxParams.initTimestamp();
                 timestamp.setHardware(packet.timestamp);
                 
                 // Send (fire and forget)
                 auto promise = request.send();
                 
-                std::cout << "[RPC] Sent onDataIndication, size=" 
-                          << packet.data.size() << " bytes" << std::endl;
+                std::cout << "[RPC] Sent onDataIndication, size=" << packet.data.size() 
+                          << " bytes, RSSI=" << (int)packet.rssi << " dBm, "
+                          << "L2ID=0x" << std::hex << packet.src_l2id << std::dec << std::endl;
                           
             } catch (const kj::Exception& e) {
                 if (e.getType() != kj::Exception::Type::DISCONNECTED) {
@@ -194,16 +218,23 @@ private:
             while (rx_thread_running_) {
                 size_t buffer_size = sizeof(buffer);
                 uint64_t timestamp = 0;
+                int8_t rssi = 0;
+                uint32_t src_l2id = 0;
                 
                 bool received = autotalks_.receive(buffer, &buffer_size, 
-                                                   &timestamp, 1000);
+                                                   &timestamp, &rssi, &src_l2id, 1000);
                 
                 if (received) {
-                    std::cout << "[RX Thread] Received " << buffer_size << " bytes" << std::endl;
+                    std::cout << "[RX Thread] Received " << buffer_size << " bytes, "
+                              << "RSSI: " << (int)rssi << " dBm, "
+                              << "Src L2ID: 0x" << std::hex << src_l2id << std::dec 
+                              << std::endl;
                     
                     ReceivedPacket packet;
                     packet.data.assign(buffer, buffer + buffer_size);
                     packet.timestamp = timestamp;
+                    packet.rssi = rssi;
+                    packet.src_l2id = src_l2id;
                     packet_queue_.push(packet);
                 }
             }

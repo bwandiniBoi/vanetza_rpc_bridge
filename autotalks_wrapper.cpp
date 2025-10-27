@@ -224,10 +224,11 @@ bool AutotalksCV2X::transmit(const uint8_t* data, size_t length, uint8_t priorit
 }
 
 bool AutotalksCV2X::receive(uint8_t* buffer, size_t* buffer_size,
-                           uint64_t* timestamp, uint32_t timeout_ms)
+                           uint64_t* timestamp, int8_t* rssi, uint32_t* src_l2id,
+                           uint32_t timeout_ms)
 {
     if (!initialized_ || !rx_socket_) {
-        std::cerr << "Not initialized" << std::endl;
+        std::cerr << "[RX] Not initialized" << std::endl;
         return false;
     }
     
@@ -246,12 +247,28 @@ bool AutotalksCV2X::receive(uint8_t* buffer, size_t* buffer_size,
     }
     
     if (atlk_error(rc)) {
-        std::cerr << "cv2x_receive failed: " << rc << std::endl;
+        std::cerr << "[RX] cv2x_receive failed: " << rc << std::endl;
         return false;
     }
     
     if (timestamp != nullptr) {
         *timestamp = rx_params.receive_time;
+    }
+    
+    // Extract RSSI from first antenna (index 0)
+    if (rssi != nullptr) {
+        // CV2X RSSI is in dbm8 format (dBm * 8)
+        // Convert to dBm by dividing by 8
+        *rssi = static_cast<int8_t>(rx_params.rssi[0] / 8);
+        std::cout << "[RX] RSSI: " << (int)*rssi << " dBm (raw: " 
+                  << rx_params.rssi[0] << ")" << std::endl;
+    }
+    
+    // Extract source L2 ID
+    if (src_l2id != nullptr) {
+        *src_l2id = rx_params.l2id_src;
+        std::cout << "[RX] Source L2 ID: 0x" << std::hex << rx_params.l2id_src 
+                  << std::dec << std::endl;
     }
     
     return true;

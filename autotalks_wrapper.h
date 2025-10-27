@@ -33,7 +33,8 @@ public:
     // timeout_ms: timeout in milliseconds
     // Returns true if data received, false on timeout or error
     bool receive(uint8_t* buffer, size_t* buffer_size, 
-                 uint64_t* timestamp, uint32_t timeout_ms);
+             uint64_t* timestamp, int8_t* rssi, uint32_t* src_l2id,
+             uint32_t timeout_ms);
     
     // Check if TX is ready
     bool is_tx_ready();
