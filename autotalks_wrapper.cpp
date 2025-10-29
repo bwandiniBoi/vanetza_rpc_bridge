@@ -26,6 +26,7 @@ AutotalksCV2X::AutotalksCV2X()
     , rx_socket_(nullptr)
     , message_id_(0)
     , initialized_(false)
+    , ue_id_(0)
 {
 }
 
@@ -73,6 +74,9 @@ bool AutotalksCV2X::initialize(const char* eth_interface)
     
     ue_id = ref_cv2x_ue_id_get();
     std::cout << "[AutotalksCV2X] UE ID: 0x" << std::hex << ue_id << std::dec << std::endl;
+    
+    // Store UE ID for later use in transmit
+    ue_id_ = ue_id;
     
     // Get services
     ddm_service_t* ddm_service_ptr = nullptr;
@@ -213,6 +217,10 @@ bool AutotalksCV2X::transmit(const uint8_t* data, size_t length, uint8_t priorit
     cv2x_send_params_t send_params;
     memset(&send_params, 0, sizeof(send_params));
     send_params.message_id = ++message_id_;
+    send_params.src_l2id = ue_id_;  // Set source L2 ID!
+    
+    std::cout << "[TX] Sending with src_l2id: 0x" << std::hex 
+              << send_params.src_l2id << std::dec << std::endl;
     
     atlk_rc_t rc = cv2x_send(tx_socket_, data, length, &send_params);
     if (atlk_error(rc)) {
