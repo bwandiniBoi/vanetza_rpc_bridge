@@ -13,8 +13,8 @@
 struct ReceivedPacket {
     std::vector<uint8_t> data;
     uint64_t timestamp;
-    int8_t rssi;           
-    uint32_t src_l2id;     
+    int16_t rssi;
+    uint32_t src_l2id;
 };
 
 class PacketQueue {
@@ -182,8 +182,8 @@ public:
                 
                 // Set CV2X parameters including RSSI
                 auto cv2xParams = rxParams.initCv2x();
-                // Convert RSSI back to dbm8 format (dBm * 8) for protocol
-                cv2xParams.setPower(static_cast<int16_t>(packet.rssi * 8));
+                // RSSI from wrapper is in dBm; capnp field is dbm8 (dBm * 8)
+                cv2xParams.setRssi(static_cast<int16_t>(packet.rssi * 8));
                 
                 // Set timestamp
                 auto timestamp = rxParams.initTimestamp();
@@ -218,7 +218,7 @@ private:
             while (rx_thread_running_) {
                 size_t buffer_size = sizeof(buffer);
                 uint64_t timestamp = 0;
-                int8_t rssi = 0;
+                int16_t rssi = 0;
                 uint32_t src_l2id = 0;
                 
                 bool received = autotalks_.receive(buffer, &buffer_size, 

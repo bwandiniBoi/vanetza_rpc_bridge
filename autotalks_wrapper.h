@@ -34,8 +34,8 @@ public:
     // src_l2id: output source L2 ID (if not NULL)
     // timeout_ms: timeout in milliseconds
     // Returns true if data received, false on timeout or error
-    bool receive(uint8_t* buffer, size_t* buffer_size, 
-                 uint64_t* timestamp, int8_t* rssi, uint32_t* src_l2id,
+    bool receive(uint8_t* buffer, size_t* buffer_size,
+                 uint64_t* timestamp, int16_t* rssi, uint32_t* src_l2id,
                  uint32_t timeout_ms);
     
     // Check if TX is ready

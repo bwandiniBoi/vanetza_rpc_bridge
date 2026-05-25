@@ -232,7 +232,7 @@ bool AutotalksCV2X::transmit(const uint8_t* data, size_t length, uint8_t priorit
 }
 
 bool AutotalksCV2X::receive(uint8_t* buffer, size_t* buffer_size,
-                           uint64_t* timestamp, int8_t* rssi, uint32_t* src_l2id,
+                           uint64_t* timestamp, int16_t* rssi, uint32_t* src_l2id,
                            uint32_t timeout_ms)
 {
     if (!initialized_ || !rx_socket_) {
@@ -267,7 +267,7 @@ bool AutotalksCV2X::receive(uint8_t* buffer, size_t* buffer_size,
     if (rssi != nullptr) {
         // CV2X RSSI is in dbm8 format (dBm * 8)
         // Convert to dBm by dividing by 8
-        *rssi = static_cast<int8_t>(rx_params.rssi[0] / 8);
+        *rssi = static_cast<int16_t>(rx_params.rssi[0] / 8);
         std::cout << "[RX] RSSI: " << (int)*rssi << " dBm (raw: " 
                   << rx_params.rssi[0] << ")" << std::endl;
     }
